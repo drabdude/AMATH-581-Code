@@ -21,7 +21,7 @@ x = x[:n]
 y = np.linspace(-L,L,n+1)
 y = y[:n]
 X, Y = np.meshgrid(x, y)
-A = 1               # Amplitude
+Amp = 1               # Amplitude
 sigma_x = 1         # Standard deviation in the x direction
 sigma_y = 1         # Standard deviation in the y direction
 tspan = np.linspace(0,4,9)
@@ -33,8 +33,8 @@ ky[0] = 1e-6
 KX, KY = np.meshgrid(kx, ky)
 K = KX**2 + KY**2
 # Initial vorticity ω(x, y, 0)
-#omega_initial = A * np.exp(-((X**2)/(sigma_x**2) + (Y**2) / (20 * sigma_y**2)))
-omega_initial = A * np.exp(-X**2 - Y**2 / 20)
+#omega_initial = Amp * np.exp(-((X**2)/(sigma_x**2) + (Y**2) / (20 * sigma_y**2)))
+omega_initial = Amp * np.exp(-X**2 - Y**2 / 20)
 
 # Plot the initial vorticity
 # plt.figure(figsize=(6, 6))
@@ -87,6 +87,11 @@ def vort(t,omega_current,psi_current,A,B,C):
     return 0.001*A@omega_current-np.multiply(B@psi_current,C@omega_current)+np.multiply(C@psi_current,B@omega_current)
 
 def fftstream(omega,K,tol):
+    # omega = np.hstack([np.real(np.fft.fft2(omega).reshape(n*n)),np.imag(np.fft.fft2(omega).reshape(n*n))])
+    # wtc = omega[0:n*n] + 1j*omega[n*n:]
+    # wt = wtc.reshape((n, n))
+    # psit = -wt / K
+    # return np.fft.ifft(psit)
     return np.fft.ifft2(np.fft.fft2(-omega)/(K))
 
 def backslashstream(omega,A,tol):
@@ -104,15 +109,13 @@ def LUstream(omega,A,tol):
     return solve_triangular(U, y)
 
 def BICstream(omega,A,tol):
-    A[0,0] = 2
     fl_omega = omega.flatten()
     x, exit =  scipy.sparse.linalg.bicgstab(A,fl_omega,rtol=tol)
     return x
 
 def GMRESstream(omega,A,tol):
-    A[0,0] = 2
     fl_omega = omega.flatten()
-    x, exit = scipy.sparse.linalg.gmres(A,fl_omega,tol=tol)
+    x, exit = scipy.sparse.linalg.gmres(A,fl_omega,rtol=tol)
     return x
 
 def timestepsolving(x,y,n,L,h,X,Y,tspan,omega_initial,method,K,tol=10e-6):
@@ -123,23 +126,30 @@ def timestepsolving(x,y,n,L,h,X,Y,tspan,omega_initial,method,K,tol=10e-6):
         inp = K
     elif method=='backslash':
         streamsolver = backslashstream
-        inp = A
+        Acopy = A.copy()
+        Acopy[0,0] = 2
+        inp = Acopy
     elif method=='LU':
         streamsolver = LUstream
         Acopy = A.copy()
-        Acopy[0,0] = 4
+        Acopy[0,0] = 2
         P, L, U = lu(Acopy)
         inp = [P,L,U]
     elif method=='BIC':
         streamsolver = BICstream
-        inp = A
+        Acopy = A.copy()
+        Acopy[0,0] = 2
+        inp = Acopy
         tol = 10e-6
     elif method=='GMRES':
         streamsolver = GMRESstream
-        inp = A
+        Acopy = A.copy()
+        Acopy[0,0] = 2
+        inp = Acopy
         tol = 10e-6
     else:
         return "Invalid method given for solving the stream function. Ensure it is one of 'fft, 'backslash', 'LU', 'BIC', or 'GMRES'"
+    #A[0,0] = 2
     omegasteps = np.reshape(omega_initial,(n**2,-1))
     psi_initial = streamsolver(omega_initial,inp,tol)
     fl_omega_current = np.reshape(omega_initial,(n**2,))
@@ -168,36 +178,68 @@ def plotter(X,Y,solutions,omega_initial,method):
     plt.title("Final Vorticity using" + " " + method)
     plt.show()
 
+A,B,C = discretematrices(n,h)
+Acopy = A.copy()
+Acopy[0,0] = 2
+P, L, U = lu(Acopy)
+fftinit = fftstream(omega_initial,K,10e-6)
+plt.contourf(X,Y,fftinit)
+plt.figure()
+backslashinit = backslashstream(omega_initial,A,10e-6)
+plt.contourf(X,Y,backslashinit)
+plt.figure()
+luinit = LUstream(omega_initial,[P,L,U],10e-6)
+luinit = np.reshape(luinit,(n,n))
+plt.contourf(X,Y,luinit)
+plt.show()
+# fftbackerror = np.linalg.norm(np.reshape(fftinit,(n**2,-1))-np.reshape(backslashinit,(n**2,-1)))
+# backluerror = np.linalg.norm(np.reshape(luinit,(n,n))-np.reshape(backslashinit,(n,n)))/np.linalg.norm(np.reshape(luinit,(n,n)))
+# print(fftbackerror)
+# print(backluerror)
+# print(omega_initial)
+# print(K)
+# print(omega_initial[0,0]/K[0,0])
+# print(omega_initial/K)
 
-# start_time = time.time() # Record the start time
-# fftsol = timestepsolving(x,y,n,L,h,X,Y,tspan,omega_initial,'fft',K)
-# end_time = time.time() # Record the end time
-# elapsed_time = end_time - start_time
-# print(f"Elapsed time using fft: {elapsed_time:.2f} seconds")
-# # Plot the final vorticity
-# plotter(X,Y,fftsol,omega_initial,"fft")
+# print(np.reshape(fftinit,(n,n)))
+# print(np.reshape(luinit,(n,n)))
+# print(backslashinit)
+# print(omega_initial)
 
-# A1 = fftsol
+start_time = time.time() # Record the start time
+fftsol = timestepsolving(x,y,n,L,h,X,Y,tspan,omega_initial,'fft',K)
+end_time = time.time() # Record the end time
+elapsed_time = end_time - start_time
+print(f"Elapsed time using fft: {elapsed_time:.2f} seconds")
+# Plot the final vorticity
+#plotter(X,Y,fftsol,omega_initial,"fft")
 
-# start_time = time.time() # Record the start time
-# backslashsol = timestepsolving(x,y,n,L,h,X,Y,tspan,omega_initial,'backslash',K)
-# end_time = time.time() # Record the end time
-# elapsed_time = end_time - start_time
-# print(f"Elapsed time using backslash: {elapsed_time:.2f} seconds")
-# # Plot the final vorticity
-# plotter(X,Y,backslashsol,omega_initial,"backslash")
+A1 = fftsol
 
-# A2 = backslashsol
 
-# start_time = time.time() # Record the start time
-# LUsol = timestepsolving(x,y,n,L,h,X,Y,tspan,omega_initial,'LU',K)
-# end_time = time.time() # Record the end time
-# elapsed_time = end_time - start_time
-# print(f"Elapsed time using LU decomp: {elapsed_time:.2f} seconds")
-# # Plot the final vorticity
-# #plotter(X,Y,LUsol,omega_initial,"LU Decomp")
+start_time = time.time() # Record the start time
+backslashsol = timestepsolving(x,y,n,L,h,X,Y,tspan,omega_initial,'backslash',K)
+end_time = time.time() # Record the end time
+elapsed_time = end_time - start_time
+print(f"Elapsed time using backslash: {elapsed_time:.2f} seconds")
+# Plot the final vorticity
+#plotter(X,Y,backslashsol,omega_initial,"backslash")
 
-# A3 = LUsol
+A2 = backslashsol
+
+start_time = time.time() # Record the start time
+LUsol = timestepsolving(x,y,n,L,h,X,Y,tspan,omega_initial,'LU',K)
+end_time = time.time() # Record the end time
+elapsed_time = end_time - start_time
+print(f"Elapsed time using LU decomp: {elapsed_time:.2f} seconds")
+# Plot the final vorticity
+#plotter(X,Y,LUsol,omega_initial,"LU Decomp")
+
+A3 = LUsol
+
+print(A1)
+print(A2)
+print(A3)
 
 # start_time = time.time() # Record the start time
 # BICsol = timestepsolving(x,y,n,L,h,X,Y,tspan,omega_initial,'BIC',K)
@@ -205,7 +247,7 @@ def plotter(X,Y,solutions,omega_initial,method):
 # elapsed_time = end_time - start_time
 # print(f"Elapsed time using BICGSTAB: {elapsed_time:.2f} seconds")
 # # Plot the final vorticity
-# #plotter(X,Y,BICsol,omega_initial,"BICGSTAB")
+# plotter(X,Y,BICsol,omega_initial,"BICGSTAB")
 
 # start_time = time.time() # Record the start time
 # GMRESsol = timestepsolving(x,y,n,L,h,X,Y,tspan,omega_initial,'GMRES',K)
@@ -213,46 +255,46 @@ def plotter(X,Y,solutions,omega_initial,method):
 # elapsed_time = end_time - start_time
 # print(f"Elapsed time using GMRES: {elapsed_time:.2f} seconds")
 # # Plot the final vorticity
-# #plotter(X,Y,GMRESsol,omega_initial,"GMRES")
+# plotter(X,Y,GMRESsol,omega_initial,"GMRES")
 
 
 
 
 # ANIMATION TIME!!!!
-tspannew = np.linspace(0,100,201)
-A = 1
-#sigma_x = 0.1         # Standard deviation in the x direction
-#sigma_y = 3           # Standard deviation in the y direction
-# Initial vorticity ω(x, y, 0)
-omega_initial = A * np.exp(-X**2 - Y**2 / 20)
+# tspannew = np.linspace(0,100,201)
+# A = 1
+# #sigma_x = 0.1         # Standard deviation in the x direction
+# #sigma_y = 3           # Standard deviation in the y direction
+# # Initial vorticity ω(x, y, 0)
+# omega_initial = A * np.exp(-X**2 - Y**2 / 20)
 
-animsol = timestepsolving(x,y,n,L,h,X,Y,tspannew,omega_initial,'LU',K)
+# animsol = timestepsolving(x,y,n,L,h,X,Y,tspannew,omega_initial,'LU',K)
 
-time_steps = len(tspannew)
-n = omega_initial.shape[0]  # Spatial grid size
+# time_steps = len(tspannew)
+# n = omega_initial.shape[0]  # Spatial grid size
 
-# Set up the figure and axis
-fig, ax = plt.subplots(figsize=(6, 6))
-#contour = ax.contourf(bigBICsol[:,0].reshape(n,n), levels=50, cmap="bone")
-contour = ax.contourf(animsol[:,0].reshape(n,n))
-#cbar = fig.colorbar(contour, ax=ax)
-#cbar.set_label("Vorticity ω")
+# # Set up the figure and axis
+# fig, ax = plt.subplots(figsize=(6, 6))
+# #contour = ax.contourf(bigBICsol[:,0].reshape(n,n), levels=50, cmap="bone")
+# contour = ax.contourf(animsol[:,0].reshape(n,n))
+# #cbar = fig.colorbar(contour, ax=ax)
+# #cbar.set_label("Vorticity ω")
 
-# Update function for the animation
-def update(frame):
-    ax.clear()  # Clear the previous frame
-    omega_reshaped = animsol[:, frame].reshape(n, n)  # Reshape in this frame
-    #contour = ax.contourf(omega_reshaped, levels=50, cmap="bone")
-    contour = ax.contourf(omega_reshaped)
-    ax.set_title(f"Time Step: {frame + 1}")
-    return contour
+# # Update function for the animation
+# def update(frame):
+#     ax.clear()  # Clear the previous frame
+#     omega_reshaped = animsol[:, frame].reshape(n, n)  # Reshape in this frame
+#     #contour = ax.contourf(omega_reshaped, levels=50, cmap="bone")
+#     contour = ax.contourf(omega_reshaped)
+#     ax.set_title(f"Time Step: {frame + 1}")
+#     return contour
 
-# Create the animation
-anim = FuncAnimation(fig, update, frames=time_steps, interval=10)
+# # Create the animation
+# anim = FuncAnimation(fig, update, frames=time_steps, interval=10)
 
 
-anim.save("vorticity_animation.gif", writer="pillow", fps=10)
+# anim.save("vorticity_animation.gif", writer="pillow", fps=10)
 
-# Show the animation
+# # Show the animation
 
-plt.show()
+# plt.show()
