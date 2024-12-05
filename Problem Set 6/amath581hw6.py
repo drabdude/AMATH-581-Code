@@ -120,23 +120,24 @@ A2 = chebsol.y
 
 
 
-tspan = np.arange(0,4,0.5)
+tspan = np.arange(0,4.5,0.5)
 Lx, Ly = 20, 20
 nx, ny = 64, 64
 Nfft = nx * ny
 
 # Define spatial domain and initial conditions
 x2 = np.linspace(-Lx/2, Lx/2, nx + 1)
+#x2 = np.linspace(-Lx/2,Lx/2,nx)
 x = x2[:nx]
 y2 = np.linspace(-Ly/2, Ly/2, ny + 1)
+#y2 = np.linspace(-Ly/2,Ly/2,ny)
 y = y2[:ny]
 Xf, Yf = np.meshgrid(x, y)
-
 # Define spectral k values
 kx = (2 * np.pi / Lx) * np.concatenate((np.arange(0, nx/2), np.arange(-nx/2, 0)))
-kx[0] = 1e-6
+#kx[0] = 1e-6
 ky = (2 * np.pi / Ly) * np.concatenate((np.arange(0, ny/2), np.arange(-ny/2, 0)))
-ky[0] = 1e-6
+#ky[0] = 1e-6
 KX, KY = np.meshgrid(kx, ky)
 K2 = KX**2 + KY**2
 
@@ -144,8 +145,15 @@ X2 = np.power(Xf,2)
 Y2 = np.power(Yf,2)
 uf = tanh(sqrt(X2 + Y2))*cos(m*angle(Xf+1j*Yf)-sqrt(X2+Y2))
 vf = tanh(sqrt(X2 + Y2))*sin(m*angle(Xf+1j*Yf)-sqrt(X2+Y2))
+
 ufft = fft2(uf)
 vfft = fft2(vf)
+
+# ufft = np.concatenate((ufft,ufft[0,:].reshape(1,nx-1)),0)
+# ufft = np.concatenate((ufft,ufft[:,0].reshape(ny,1)),1)
+# vfft = np.concatenate((vfft,vfft[0,:].reshape(1,nx-1)),0)
+# vfft = np.concatenate((vfft,vfft[:,0].reshape(ny,1)),1)
+
 uv0fft = np.hstack([ufft.reshape(nx**2),vfft.reshape(ny**2)])
 
 def RD_2Dfft2(t, uv_fft, beta, nx, ny, K2):
@@ -156,7 +164,7 @@ def RD_2Dfft2(t, uv_fft, beta, nx, ny, K2):
     # Transform back to physical space
     u = ifft2(u_fft)
     v = ifft2(v_fft)
-    
+
     # Compute nonlinear terms in physical space
     A2 = u**2 + v**2
     lam = 1 - A2
@@ -242,7 +250,3 @@ anim = FuncAnimation(fig, update, frames=len(tspan), interval=100)
 # Show the animation
 
 plt.show()
-
-
-print(A1)
-print(A2)
