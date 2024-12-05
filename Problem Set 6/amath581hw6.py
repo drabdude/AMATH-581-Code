@@ -120,30 +120,38 @@ A2 = chebsol.y
 
 
 
+tspan = np.arange(0,4,0.5)
+Lx, Ly = 20, 20
+nx, ny = 64, 64
+Nfft = nx * ny
 
-Nfft = 64
-#fft initial
-kx = (2 * np.pi / 20) * np.concatenate((np.arange(0, Nfft/2), np.arange(-Nfft/2, 0)))
+# Define spatial domain and initial conditions
+x2 = np.linspace(-Lx/2, Lx/2, nx + 1)
+x = x2[:nx]
+y2 = np.linspace(-Ly/2, Ly/2, ny + 1)
+y = y2[:ny]
+Xf, Yf = np.meshgrid(x, y)
+
+# Define spectral k values
+kx = (2 * np.pi / Lx) * np.concatenate((np.arange(0, nx/2), np.arange(-nx/2, 0)))
 kx[0] = 1e-6
-ky = (2 * np.pi / 20) * np.concatenate((np.arange(0, Nfft/2), np.arange(-Nfft/2, 0)))
+ky = (2 * np.pi / Ly) * np.concatenate((np.arange(0, ny/2), np.arange(-ny/2, 0)))
 ky[0] = 1e-6
 KX, KY = np.meshgrid(kx, ky)
 K2 = KX**2 + KY**2
-x = np.linspace(-10,10,Nfft)
-y = x
-Xf,Yf = meshgrid(x,y)
+
 X2 = np.power(Xf,2)
 Y2 = np.power(Yf,2)
 uf = tanh(sqrt(X2 + Y2))*cos(m*angle(Xf+1j*Yf)-sqrt(X2+Y2))
 vf = tanh(sqrt(X2 + Y2))*sin(m*angle(Xf+1j*Yf)-sqrt(X2+Y2))
 ufft = fft2(uf)
 vfft = fft2(vf)
-uv0fft = np.hstack([ufft.reshape(Nfft**2),vfft.reshape(Nfft**2)])
+uv0fft = np.hstack([ufft.reshape(nx**2),vfft.reshape(ny**2)])
 
-def RD_2Dfft2(t, uv_fft, beta, Nfft, K2):
+def RD_2Dfft2(t, uv_fft, beta, nx, ny, K2):
     # Split u and v in Fourier domain
-    u_fft = uv_fft[:Nfft**2].reshape((Nfft, Nfft))
-    v_fft = uv_fft[Nfft**2:].reshape((Nfft, Nfft))
+    u_fft = uv_fft[:Nfft].reshape((nx, ny))
+    v_fft = uv_fft[Nfft:].reshape((nx, ny))
     
     # Transform back to physical space
     u = ifft2(u_fft)
@@ -173,12 +181,12 @@ def RD_2Dfft2(t, uv_fft, beta, Nfft, K2):
     return rhs_fft
 
 #tspan = np.linspace(0,50,101)
-fftsol = solve_ivp(RD_2Dfft2,[0,4],uv0fft,method = 'RK45',t_eval=tspan,args=(beta,Nfft,K2))
+fftsol = solve_ivp(RD_2Dfft2,[0,4],uv0fft,method = 'RK45',t_eval=tspan,args=(beta,nx,ny,K2))
 
 A1 = fftsol.y
 
 
-N = Nfft
+N = nx
 X = Xf
 Y = Yf
 ufinal = ifft2(fftsol.y[0:N**2,-1].reshape(N,N)).real
