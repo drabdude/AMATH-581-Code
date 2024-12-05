@@ -31,14 +31,14 @@ D, x = cheb(N)
 
 D[N,:] = 0
 D[0,:] = 0
-Dxx = np.dot(D,D)/(20/2)**2
+Dxx = np.dot(D,D)/100
 y = x
 N2 = (N+1)*(N+1)
 I = np.eye(len(Dxx))
 L = kron(I,Dxx) + kron(Dxx,I)
 X,Y = meshgrid(10*x,10*y)
 x = x*10
-y = y+10
+y = y*10
 
 m=1
 beta=1
@@ -51,11 +51,11 @@ uv0 = np.hstack([u.reshape(N2),v.reshape(N2)])
 def RD_2D(t,uv,beta,N2,L):
     u = uv[0:N2]
     v = uv[N2:]
-    A2 = u**2 + v**2
-    lam = 1-A2
-    omega = -beta*A2
+    A = u**2 + v**2
+    lam = 1-A
+    omega = -beta*A
     rhsu = 0.1*np.dot(L,u) + lam*u - omega*v
-    rhsv = 0.1*np.dot(L,u) + omega*u - lam*v
+    rhsv = 0.1*np.dot(L,v) + omega*u + lam*v
     rhs = np.hstack([rhsu,rhsv])
     return rhs
 
@@ -64,59 +64,59 @@ chebsol = solve_ivp(RD_2D,[0,4],uv0,method = 'RK45',t_eval=tspan,args=(beta,N2,L
 
 A2 = chebsol.y
 
-ufinal = chebsol.y[0:N2,-1]
-vfinal = chebsol.y[N2:,-1]
+# ufinal = chebsol.y[0:N2,-1]
+# vfinal = chebsol.y[N2:,-1]
 
-plt.figure(figsize=(6, 6))
-plt.contourf(10*X, 10*Y, np.reshape(u,np.shape(u)))
-plt.xlabel("x")
-plt.ylabel("y")
-plt.title("Initial u")
-plt.show()
+# plt.figure(figsize=(6, 6))
+# plt.contourf(10*X, 10*Y, np.reshape(u,np.shape(u)))
+# plt.xlabel("x")
+# plt.ylabel("y")
+# plt.title("Initial u")
+# plt.show()
 
-plt.figure(figsize=(6, 6))
-plt.contourf(X, Y, np.reshape(v,np.shape(v)))
-plt.xlabel("x")
-plt.ylabel("y")
-plt.title("Initial v")
-plt.show()
+# plt.figure(figsize=(6, 6))
+# plt.contourf(X, Y, np.reshape(v,np.shape(v)))
+# plt.xlabel("x")
+# plt.ylabel("y")
+# plt.title("Initial v")
+# plt.show()
 
-plt.figure(figsize=(6, 6))
-plt.contourf(X, Y, np.reshape(ufinal,np.shape(u)))
-plt.xlabel("x")
-plt.ylabel("y")
-plt.title("Final u")
-plt.show()
+# plt.figure(figsize=(6, 6))
+# plt.contourf(X, Y, np.reshape(ufinal,np.shape(u)))
+# plt.xlabel("x")
+# plt.ylabel("y")
+# plt.title("Final u")
+# plt.show()
 
-plt.figure(figsize=(6, 6))
-plt.contourf(X, Y, np.reshape(vfinal,np.shape(v)))
-plt.xlabel("x")
-plt.ylabel("y")
-plt.title("Final v")
-plt.show()
+# plt.figure(figsize=(6, 6))
+# plt.contourf(X, Y, np.reshape(vfinal,np.shape(v)))
+# plt.xlabel("x")
+# plt.ylabel("y")
+# plt.title("Final v")
+# plt.show()
 
 
 # Set up the figure and axis
-fig, ax = plt.subplots(figsize=(6, 6))
-contour = ax.contourf(u)
+# fig, ax = plt.subplots(figsize=(6, 6))
+# contour = ax.contourf(u)
 
 # Update function for the animation
-def update(frame):
-    ax.clear()
-    unew = chebsol.y[0:N2, frame] 
-    contour = ax.contourf(X,Y,np.reshape(unew,np.shape(u)))
-    ax.set_title(f"Time Step: {frame}")
-    return contour
+# def update(frame):
+#     ax.clear()
+#     unew = chebsol.y[0:N2, frame] 
+#     contour = ax.contourf(X,Y,np.reshape(unew,np.shape(u)))
+#     ax.set_title(f"Time Step: {frame}")
+#     return contour
 
-# Create the animation
-anim = FuncAnimation(fig, update, frames=len(tspan), interval=10)
+# # Create the animation
+# anim = FuncAnimation(fig, update, frames=len(tspan), interval=10)
 
 
 #anim.save("vorticity_animation.gif", writer="pillow", fps=10)
 
 # Show the animation
 
-plt.show()
+# plt.show()
 
 
 
@@ -156,7 +156,7 @@ def RD_2Dfft2(t, uv_fft, beta, Nfft, K2):
     
     # Compute the right-hand side in physical space
     rhsu_phys = lam * u - omega * v
-    rhsv_phys = omega * u - lam * v
+    rhsv_phys = omega * u + lam * v
     
     # Transform the RHS back to Fourier space
     rhsu_fft = fft2(rhsu_phys)
@@ -238,6 +238,3 @@ plt.show()
 
 print(A1)
 print(A2)
-
-print(np.shape(A1))
-print(np.shape(A2))

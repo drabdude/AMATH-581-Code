@@ -214,6 +214,8 @@ def plotter(sol,N,X,Y,u,v,bool):
     plt.show()
 
 
-plotter(chebsol,Ncheb+1,X,Y,u,v,0)
+#plotter(chebsol,Ncheb+1,X,Y,u,v,0)
 
 #plotter(fftsol,Nfft,Xf,Yf,uf,vf,1)
+
+print(A2[0:5,0:5])
